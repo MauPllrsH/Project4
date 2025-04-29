@@ -14,6 +14,14 @@ def display_cleaning_ui(original_df, data_description, cleaning_suggestions, nul
     st.markdown("**Cleaning Suggestions:**")
     st.markdown(cleaning_suggestions)
 
+    # Add a "Continue to Data Analysis" button at the top level to allow skipping cleaning
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        if st.button("Skip to Data Analysis", key="skip_to_analysis"):
+            # Set state to proceed to data analysis
+            st.session_state.proceed_to_analysis = True
+            st.rerun()
+
     # Ask if user wants to clean the data
     clean_data = st.radio(
         "Would you like to apply the suggested data cleaning steps?",
@@ -209,6 +217,9 @@ def show_cleaning_preview(original_df, clean_df, cleaning_code, cleaning_output,
                     st.session_state.show_cleaning_preview = False
                     st.session_state.display_clean_options = False
 
+                    # Set flag to indicate changes have been applied
+                    st.session_state.changes_applied = True
+
                     st.success("Dataset replaced with cleaned version!")
                     # Rerun to update the app
                     st.rerun()
@@ -225,6 +236,14 @@ def show_cleaning_preview(original_df, clean_df, cleaning_code, cleaning_output,
                 st.session_state.display_clean_options = False
                 st.success("Changes discarded!")
                 st.rerun()
+
+        # Add button to proceed to data analysis
+        if st.button("Continue to Data Analysis"):
+            # Set state to proceed to data analysis
+            st.session_state.proceed_to_analysis = True
+            st.session_state.show_cleaning_preview = False
+            st.session_state.display_clean_options = False
+            st.rerun()
 
     with code_tab:
         st.code(cleaning_code, language="python")

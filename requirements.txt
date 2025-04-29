@@ -4,3 +4,8 @@ matplotlib
 seaborn
 python-dotenv
 openai
+reportlab
+markdown
+beautifulsoup4
+numpy
+altair

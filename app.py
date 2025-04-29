@@ -11,6 +11,7 @@ from utils.file_handlers import cleanup_temp_files
 from components.data_upload import handle_dataset_upload
 from components.data_preview import display_data_preview, display_null_analysis
 from components.data_cleaning_ui import display_cleaning_ui
+from components.data_analysis_ui import display_analysis_ui
 
 # Import services
 from services.openai_service import generate_data_description
@@ -98,6 +99,24 @@ def init_session_state():
         st.session_state.file_processed = False
     if 'changes_applied' not in st.session_state:
         st.session_state.changes_applied = False
+
+    # Data analysis session state variables
+    if 'proceed_to_analysis' not in st.session_state:
+        st.session_state.proceed_to_analysis = False
+    if 'analysis_suggestions' not in st.session_state:
+        st.session_state.analysis_suggestions = None
+    if 'display_analysis_options' not in st.session_state:
+        st.session_state.display_analysis_options = False
+    if 'show_analysis_preview' not in st.session_state:
+        st.session_state.show_analysis_preview = False
+    if 'visualization_code' not in st.session_state:
+        st.session_state.visualization_code = None
+    if 'visualization_output' not in st.session_state:
+        st.session_state.visualization_output = None
+    if 'figures' not in st.session_state:
+        st.session_state.figures = []
+    if 'analysis_insights' not in st.session_state:
+        st.session_state.analysis_insights = None
 
 
 # Check for OpenAI API key
@@ -188,27 +207,52 @@ if uploaded_file is None and st.session_state.file_processed:
 if st.session_state.df is not None:
     df = st.session_state.df
 
-    # Display data preview
-    display_data_preview(df)
+    # Determine which data frame to use (original or cleaned)
+    active_df = st.session_state.full_df if st.session_state.full_df is not None else df
 
-    # Display data description if available
-    if st.session_state.data_description:
-        st.subheader("Data Description")
-        st.write(st.session_state.data_description)
-
-    # Display null value analysis
-    if st.session_state.null_analysis:
-        display_null_analysis(st.session_state.null_analysis)
-
-    # Display data cleaning options if description and suggestions are available
-    if st.session_state.data_description and st.session_state.cleaning_suggestions:
-        # Updated function call to use display_cleaning_ui
-        display_cleaning_ui(
-            st.session_state.full_df if st.session_state.full_df is not None else df,
+    # Check if we should proceed to data analysis
+    if st.session_state.proceed_to_analysis:
+        # Display data analysis UI
+        display_analysis_ui(
+            active_df,
             st.session_state.data_description,
-            st.session_state.cleaning_suggestions,
             st.session_state.null_analysis
         )
+
+        # Add a button to go back to data cleaning
+        if st.button("← Back to Data Cleaning"):
+            st.session_state.proceed_to_analysis = False
+            st.rerun()
+    else:
+        # Display data preview
+        display_data_preview(df)
+
+        # Display data description if available
+        if st.session_state.data_description:
+            st.subheader("Data Description")
+            st.write(st.session_state.data_description)
+
+        # Display null value analysis
+        if st.session_state.null_analysis:
+            display_null_analysis(st.session_state.null_analysis)
+
+        # Display data cleaning options if description and suggestions are available
+        if st.session_state.data_description and st.session_state.cleaning_suggestions:
+            # Updated function call to use display_cleaning_ui
+            display_cleaning_ui(
+                active_df,
+                st.session_state.data_description,
+                st.session_state.cleaning_suggestions,
+                st.session_state.null_analysis
+            )
+
+        # Add a "Continue to Data Analysis" button at the main level for datasets that have already been processed
+        # or if the user has already applied cleaning changes
+        if st.session_state.changes_applied:
+            st.markdown("---")
+            if st.button("Continue to Data Analysis", key="continue_main_level"):
+                st.session_state.proceed_to_analysis = True
+                st.rerun()
 
 # Register a callback to clean up temp files when the app reruns
 if st.session_state.temp_files:
