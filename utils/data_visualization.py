@@ -265,3 +265,163 @@ def generate_pdf_report(df, figures, insights):
         buffer.close()
 
         return pdf_data
+
+
+def generate_model_pdf_report(df, model_results, metrics, figures):
+    """Generate a PDF report for the model results"""
+    try:
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.lib import colors
+        import markdown
+        from io import BytesIO
+        import tempfile
+        import pandas as pd
+
+        # Create a BytesIO object to store the PDF
+        buffer = BytesIO()
+
+        # Create the PDF document
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+
+        # Create custom styles
+        styles.add(ParagraphStyle(name='ModelReportTitle',
+                                  fontName='Helvetica-Bold',
+                                  fontSize=16,
+                                  spaceAfter=12))
+        styles.add(ParagraphStyle(name='ModelReportHeading2',
+                                  fontName='Helvetica-Bold',
+                                  fontSize=14,
+                                  spaceAfter=10))
+        styles.add(ParagraphStyle(name='ModelReportNormal',
+                                  fontName='Helvetica',
+                                  fontSize=10,
+                                  spaceAfter=8))
+
+        # Build the PDF content
+        content = []
+
+        # Add title
+        content.append(Paragraph("Machine Learning Model Report", styles['ModelReportTitle']))
+        content.append(Spacer(1, 0.2 * inch))
+
+        # Add model information
+        content.append(Paragraph("Model Information", styles['ModelReportHeading2']))
+
+        if isinstance(model_results, dict):
+            model_type = model_results.get('model_type', 'Unknown Model')
+            content.append(Paragraph(f"Model Type: {model_type}", styles['ModelReportNormal']))
+
+            # Add any additional model details if available
+            for key, value in model_results.items():
+                if key != 'model_type' and key != 'feature_importance' and not isinstance(value,
+                                                                                          (dict, list, pd.DataFrame)):
+                    content.append(Paragraph(f"{key}: {value}", styles['ModelReportNormal']))
+
+        content.append(Spacer(1, 0.2 * inch))
+
+        # Add metrics
+        content.append(Paragraph("Model Performance Metrics", styles['ModelReportHeading2']))
+
+        # Create a table for metrics
+        if metrics:
+            metrics_data = [['Metric', 'Value']]
+            for key, value in metrics.items():
+                # Format numeric values
+                if isinstance(value, float):
+                    value = f"{value:.4f}"
+                metrics_data.append([key, str(value)])
+
+            # Create the table
+            metrics_table = Table(metrics_data, colWidths=[3 * inch, 3 * inch])
+            metrics_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (1, 0), 'CENTER'),
+                ('FONTNAME', (0, 0), (1, 0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0, 0), (1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ALIGN', (0, 1), (1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            content.append(metrics_table)
+        else:
+            content.append(Paragraph("No metrics available", styles['ModelReportNormal']))
+
+        content.append(Spacer(1, 0.3 * inch))
+
+        # Add feature importance if available
+        if isinstance(model_results, dict) and 'feature_importance' in model_results:
+            content.append(Paragraph("Feature Importance", styles['ModelReportHeading2']))
+
+            # Check if feature importance is a DataFrame
+            if isinstance(model_results['feature_importance'], pd.DataFrame):
+                fi_df = model_results['feature_importance']
+                fi_data = [fi_df.columns.tolist()]
+                for _, row in fi_df.iterrows():
+                    fi_data.append([str(x) for x in row.tolist()])
+
+                # Create the table
+                fi_table = Table(fi_data)
+                fi_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                    ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                    ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ]))
+                content.append(fi_table)
+            else:
+                # If not a DataFrame, just add as text
+                content.append(Paragraph(str(model_results['feature_importance']), styles['ModelReportNormal']))
+
+            content.append(Spacer(1, 0.3 * inch))
+
+        # Add visualizations
+        content.append(Paragraph("Model Visualizations", styles['ModelReportHeading2']))
+
+        # Save figures to temporary image files and add to the PDF
+        for i, fig in enumerate(figures):
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                fig.savefig(tmp.name, format='png', dpi=300, bbox_inches='tight')
+                img = Image(tmp.name, width=6 * inch, height=4 * inch)
+                content.append(img)
+                content.append(Spacer(1, 0.1 * inch))
+
+        # Build the PDF
+        doc.build(content)
+
+        # Get the PDF data
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        return pdf_data
+
+    except Exception as e:
+        import traceback
+        error_msg = f"Error generating model PDF report: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+
+        # Create a simple error PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+
+        content = []
+        content.append(Paragraph("Error Generating Model PDF Report", styles['Title']))
+        content.append(Paragraph(str(e), styles['Normal']))
+
+        doc.build(content)
+
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        return pdf_data

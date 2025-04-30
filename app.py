@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 import traceback
 import os
@@ -12,6 +13,7 @@ from components.data_upload import handle_dataset_upload
 from components.data_preview import display_data_preview, display_null_analysis
 from components.data_cleaning_ui import display_cleaning_ui
 from components.data_analysis_ui import display_analysis_ui
+from components.data_modeling_ui import display_modeling_ui
 
 # Import services
 from services.openai_service import generate_data_description
@@ -118,6 +120,26 @@ def init_session_state():
     if 'analysis_insights' not in st.session_state:
         st.session_state.analysis_insights = None
 
+    # Data modeling session state variables
+    if 'proceed_to_modeling' not in st.session_state:
+        st.session_state.proceed_to_modeling = False
+    if 'modeling_suggestions' not in st.session_state:
+        st.session_state.modeling_suggestions = None
+    if 'display_modeling_options' not in st.session_state:
+        st.session_state.display_modeling_options = False
+    if 'show_model_preview' not in st.session_state:
+        st.session_state.show_model_preview = False
+    if 'model_code' not in st.session_state:
+        st.session_state.model_code = None
+    if 'model_output' not in st.session_state:
+        st.session_state.model_output = None
+    if 'model_results' not in st.session_state:
+        st.session_state.model_results = None
+    if 'model_metrics' not in st.session_state:
+        st.session_state.model_metrics = None
+    if 'model_figures' not in st.session_state:
+        st.session_state.model_figures = []
+
 
 # Check for OpenAI API key
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -210,8 +232,23 @@ if st.session_state.df is not None:
     # Determine which data frame to use (original or cleaned)
     active_df = st.session_state.full_df if st.session_state.full_df is not None else df
 
+    # Check if we should proceed to modeling
+    if st.session_state.proceed_to_modeling:
+        # Display data modeling UI
+        display_modeling_ui(
+            active_df,
+            st.session_state.data_description,
+            st.session_state.null_analysis
+        )
+
+        # Add a button to go back to data analysis
+        if st.button("← Back to Data Analysis"):
+            st.session_state.proceed_to_modeling = False
+            st.session_state.proceed_to_analysis = True
+            st.rerun()
+
     # Check if we should proceed to data analysis
-    if st.session_state.proceed_to_analysis:
+    elif st.session_state.proceed_to_analysis:
         # Display data analysis UI
         display_analysis_ui(
             active_df,
@@ -219,10 +256,19 @@ if st.session_state.df is not None:
             st.session_state.null_analysis
         )
 
-        # Add a button to go back to data cleaning
-        if st.button("← Back to Data Cleaning"):
-            st.session_state.proceed_to_analysis = False
-            st.rerun()
+        # Add buttons for navigation
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("← Back to Data Cleaning"):
+                st.session_state.proceed_to_analysis = False
+                st.rerun()
+
+        with col2:
+            if st.button("Continue to Modeling →"):
+                st.session_state.proceed_to_modeling = True
+                st.session_state.proceed_to_analysis = False
+                st.rerun()
     else:
         # Display data preview
         display_data_preview(df)
