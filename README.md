@@ -11,7 +11,7 @@ Key features:
 - 🧹 Smart data cleaning with automated code generation
 - 📈 Advanced data visualization with customizable options
 - 🤖 Machine learning model building and evaluation
-- 📑 Export capabilities for reports and findings
+- 📑 Export capabilities for PDF reports
 
 ## Requirements
 
@@ -61,11 +61,40 @@ scikit-learn
 
 3. Upload a CSV file using the file uploader.
 
-4. Navigate through the different tabs to:
-   - Preview and understand your data
-   - Clean and preprocess your data
-   - Generate visualizations and insights
-   - Build and evaluate machine learning models
+4. The application will guide you through the data analysis process:
+   - **Data Preview**: View your data and see automatic analysis of dataset statistics
+   - **Data Cleaning**: Get AI-generated suggestions for cleaning your data
+   - **Data Analysis**: Generate visualizations and insights about your data
+   - **Machine Learning**: Train and evaluate ML models appropriate for your dataset
+   - **Export Reports**: Generate professional PDF reports of your findings
+
+## Features in Detail
+
+### Data Preview
+- Automatically analyzes and displays dataset statistics
+- Identifies null values and patterns
+- Generates an intelligent description of the dataset
+- Provides comprehensive null value analysis with visualizations
+
+### Data Cleaning
+- Suggests data cleaning steps based on dataset quality issues
+- Generates ready-to-use Python code for data cleaning operations
+- Provides before/after comparison of cleaning operations
+- Interactive UI for approving or discarding changes
+- Summary of all cleaning steps applied
+
+### Data Analysis
+- Creates insightful visualizations based on data characteristics
+- Generates narrative insights explaining key findings
+- Allows custom analysis based on user instructions
+- Supports exporting visualizations and insights as PDF reports
+
+### Machine Learning
+- Suggests appropriate models based on dataset characteristics
+- Builds and evaluates models with proper train/test splits
+- Provides comprehensive model metrics and performance visualizations
+- Feature importance analysis for model interpretability
+- Model results export as PDF reports
 
 ## Project Structure
 
@@ -92,33 +121,24 @@ scikit-learn
     └── file_handlers.py       # File handling utilities
 ```
 
-## Features in Detail
+## Module Descriptions
 
-### Data Preview
-- Automatically analyzes and displays dataset statistics
-- Identifies null values and patterns
-- Generates an intelligent description of the dataset
+### App.py
+The main entry point of the application that handles session state management, file uploads, and navigates between different views of the application.
 
-### Data Cleaning
-- Suggests cleaning steps based on data quality issues
-- Generates ready-to-use Python code for data cleaning
-- Provides before/after comparison of cleaning operations
+### Components
+- **data_upload.py**: Handles the file upload process, including chunking for large files
+- **data_preview.py**: Displays dataset previews and null value analysis
+- **data_cleaning_ui.py**: UI for data cleaning operations with before/after comparisons
+- **data_analysis_ui.py**: UI for data analysis and visualization generation
+- **data_modeling_ui.py**: UI for machine learning model training and evaluation
 
-### Data Analysis
-- Creates insightful visualizations based on data characteristics
-- Generates narrative insights explaining key findings
-- Allows custom analysis based on user instructions
+### Services
+- **openai_service.py**: Handles communication with OpenAI API for generating data descriptions, cleaning suggestions, and other AI-powered features
 
-### Machine Learning
-- Suggests appropriate models based on dataset characteristics
-- Builds and evaluates models with proper train/test splits
-- Provides model metrics and visualizations of model performance
-
-### Report Generation
-- Creates professional PDF reports of analysis findings
-- Includes visualizations, insights, and model results
-- Provides downloadable artifacts for sharing
-
-## Fallback Functionality
-
-The application includes fallback mechanisms for when the OpenAI API is unavailable or reaches rate limits. Basic functionality will continue to work even without API connectivity.
+### Utils
+- **data_analysis.py**: Functions for analyzing datasets and generating statistics
+- **data_cleaning.py**: Functions for generating and executing data cleaning code
+- **data_modeling.py**: Functions for machine learning model suggestion, generation, and evaluation
+- **data_visualization.py**: Functions for creating data visualizations and PDF reports
+- **file_handlers.py**: Utilities for file operations and safe DataFrame handling
