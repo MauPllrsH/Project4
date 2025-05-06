@@ -104,7 +104,11 @@ def init_session_state():
 
 
 # Check for OpenAI API key
-openai_api_key = os.getenv("OPENAI_API_KEY")
+openai_api_key = None
+if 'OPENAI_API_KEY' in os.environ:
+    openai_api_key = os.environ['OPENAI_API_KEY']
+elif st.secrets and "openai" in st.secrets and "OPENAI_API_KEY" in st.secrets["openai"]:
+    openai_api_key = st.secrets["openai"]["OPENAI_API_KEY"]
 if not openai_api_key:
     st.warning("⚠️ OpenAI API key not found. The app will run without AI-powered data analysis.")
     st.info("To enable AI features, please add your OpenAI API key to the .env file as OPENAI_API_KEY=your_key_here")
