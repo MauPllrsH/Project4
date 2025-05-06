@@ -122,7 +122,3 @@ scikit-learn
 ## Fallback Functionality
 
 The application includes fallback mechanisms for when the OpenAI API is unavailable or reaches rate limits. Basic functionality will continue to work even without API connectivity.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
