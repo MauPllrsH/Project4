@@ -85,26 +85,5 @@ def display_null_analysis(null_analysis, df=None):
         st.write("These column pairs have highly correlated null patterns:")
         for pair in null_analysis['correlated_nulls']:
             st.write(f"- {pair['column1']} & {pair['column2']}: correlation = {pair['correlation']:.2f}")
-
-    # Distribution of nulls across rows
-    if null_analysis['rows_with_nulls'] > 0:
-        st.subheader("Distribution of Nulls Across Rows")
-
-        # Convert to DataFrame for better display
-        null_dist = pd.DataFrame([
-            {"Nulls per Row": int(k), "Count": v}
-            for k, v in null_analysis['null_counts_per_row'].items()
-        ]).sort_values("Nulls per Row")
-
-        # Create a simple bar chart
-        chart = alt.Chart(null_dist).mark_bar().encode(
-            x='Nulls per Row:O',
-            y='Count:Q',
-            tooltip=['Nulls per Row', 'Count']
-        ).properties(
-            title='Distribution of Null Values Across Rows',
-            width=600
-        )
-        st.altair_chart(chart, use_container_width=True)
     else:
         st.success("No rows contain null values. Your dataset is complete!")

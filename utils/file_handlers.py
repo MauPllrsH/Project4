@@ -3,6 +3,7 @@ import uuid
 import tempfile
 import pandas as pd
 
+
 def save_to_temp_csv(df, prefix="cleaned_data_"):
     """Save DataFrame to a temporary CSV file and return the file path"""
     temp_dir = tempfile.gettempdir()
@@ -10,9 +11,11 @@ def save_to_temp_csv(df, prefix="cleaned_data_"):
     df.to_csv(temp_file, index=False)
     return temp_file
 
+
 def load_from_csv(file_path):
     """Load DataFrame from CSV file"""
     return pd.read_csv(file_path)
+
 
 def cleanup_temp_files(file_paths):
     """Remove temporary files"""
@@ -23,6 +26,7 @@ def cleanup_temp_files(file_paths):
         except Exception as e:
             print(f"Could not remove temporary file {file_path}: {e}")
     return []
+
 
 def safe_display_dataframe(df, num_rows=10):
     """Safely display a DataFrame, handling PyArrow conversion issues"""

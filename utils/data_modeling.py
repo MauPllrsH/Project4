@@ -1,3 +1,4 @@
+import base64
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ import sys
 from io import StringIO
 from services.openai_service import call_openai_api
 import matplotlib
+import streamlit as st
 
 matplotlib.use('Agg')  # Use non-interactive backend
 
@@ -15,7 +17,7 @@ def generate_modeling_suggestions(df, data_description, null_analysis):
     """Generate modeling suggestions using OpenAI"""
     # First check if df is valid
     if df is None or not hasattr(df, 'empty') or df.empty:
-        return generate_fallback_modeling_suggestions()
+        return "⚠️ OpenAI API connection error. Please check your API key and internet connection. The AI-powered suggestions are unavailable at the moment."
 
     system_prompt = '''
     You are a data science assistant. Based on the dataset information provided, you will suggest specific machine learning models and approaches that would be most appropriate for this data.
@@ -75,43 +77,24 @@ def generate_modeling_suggestions(df, data_description, null_analysis):
         # Log the error for debugging
         if error:
             print(f"OpenAI API error: {error}")
-            return generate_fallback_modeling_suggestions()
+            return "⚠️ OpenAI API connection error. Please check your API key and internet connection. The AI-powered suggestions are unavailable at the moment."
 
         # Check if we got a valid response
         if response and isinstance(response, str) and len(response.strip()) > 0:
             return response
         else:
             print("Empty or invalid response from OpenAI API")
-            return generate_fallback_modeling_suggestions()
+            return "⚠️ OpenAI API returned an empty response. Please try again later."
 
     except Exception as e:
         import traceback
         print(f"Error in generate_modeling_suggestions: {str(e)}")
         print(traceback.format_exc())
-        return generate_fallback_modeling_suggestions()
-
-
-def generate_fallback_modeling_suggestions():
-    """Generate basic modeling suggestions without using OpenAI API"""
-    suggestions = """
-    - **Linear Regression**: Suitable for predicting numerical outcomes with linear relationships. Simple and interpretable but may underfit complex relationships.
-
-    - **Random Forest**: Versatile ensemble method for both classification and regression problems. Handles non-linear relationships well and provides feature importance metrics.
-
-    - **Gradient Boosting (XGBoost/LightGBM)**: Powerful algorithm that often achieves state-of-the-art results. Good for both classification and regression tasks with complex patterns.
-
-    - **Logistic Regression**: Appropriate for binary or multi-class classification problems. Simple, interpretable, and works well with small to medium datasets.
-
-    - **K-Means Clustering**: Useful for unsupervised learning to identify natural groupings in the data. Consider this if your goal is to segment data without labeled outcomes.
-
-    - **Support Vector Machine**: Effective for classification tasks, especially in high-dimensional spaces. Works well when classes are separable and dataset size is medium.
-    """
-
-    return suggestions
+        return "⚠️ An error occurred while generating modeling suggestions. Please try again later."
 
 
 def generate_model_code(df, target_variable, model_approach, user_instructions=""):
-    """Generate simplified model training code using OpenAI that works reliably with Streamlit"""
+    """Generate model training code using OpenAI"""
 
     # Get detailed column information
     column_info = []
@@ -124,11 +107,15 @@ def generate_model_code(df, target_variable, model_approach, user_instructions="
     system_prompt = '''
     You are a Python machine learning code generation assistant. Generate SIMPLE, RELIABLE code that trains a machine learning model and stores results for display in a Streamlit application.
 
-    CRITICALLY IMPORTANT: 1. Place ALL imports at the top of the code 2. ONLY return executable Python code (no 
-    markdown) 3. The DataFrame is already available as 'df' 4. DO NOT use any Python print() statements 5. Store ALL 
-    results in the metrics dictionary and figures list 6. Assume the data is already clean and there is no need to 
-    handle na values 7. Make sure to handle the different categorical columns appropiately, if a column is datetime, 
-    or an object, do the necessary steps to turn the values into something that can be used to predict
+    CRITICALLY IMPORTANT: 
+    1. Place ALL imports at the top of the code 
+    2. ONLY return executable Python code (no markdown) 
+    3. The DataFrame is already available as 'df' 
+    4. DO NOT use any Python print() statements 
+    5. Store ALL results in the metrics dictionary and figures list 
+    6. Handle different categorical columns appropriately - if a column is datetime or object type, convert values into something that can be used for prediction
+    7. For classification reports, store the full output in metrics["Classification Report"]
+    8. ALWAYS create a feature importance visualization regardless of the model type
 
     Your code MUST follow this EXACT structure:
     # START CODE
@@ -137,6 +124,7 @@ def generate_model_code(df, target_variable, model_approach, user_instructions="
     import numpy as np
     import matplotlib.pyplot as plt
     import seaborn as sns
+    from sklearn.inspection import permutation_importance
     # Add only the imports you actually need
 
     # Initialize result variables
@@ -149,41 +137,72 @@ def generate_model_code(df, target_variable, model_approach, user_instructions="
         # Make a copy of the dataset
         df_model = df.copy()
 
-        # Basic preprocessing - just handle nulls and convert categoricals
-        # No pipeline, no fancy preprocessing
+        # Basic preprocessing - handle nulls and convert categoricals
 
         # Split data 80/20
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Train a SIMPLE model - no hyperparameter tuning
+        # Train a model with appropriate parameters
 
-        # Calculate basic metrics and store in metrics dictionary
-        # IMPORTANT: Convert all numpy values to Python native types
-        metrics["accuracy"] = float(accuracy)  # Example
-
-        # For classification models ONLY, create a simple confusion matrix visualization
+        # Calculate metrics and store in metrics dictionary
+        # For classification metrics, include the full classification_report
         if is_classification:
-            fig, ax = plt.subplots(figsize=(8, 6))
-            # Plot confusion matrix
-            figures.append(fig)
-            plt.close(fig)
+            report = classification_report(y_test, y_pred, output_dict=True)
+            metrics["Classification Report"] = report
+
+        # Generate feature importance using ONE of the following methods (in order of preference):
+        # 1. Use model.feature_importances_ if available
+        # 2. Use model.coef_ if available (for linear models)
+        # 3. Use permutation_importance if neither is available
+        # ALWAYS create a feature importance plot regardless of model type
+
+        # Create visualizations and add to figures list
+        # Always close figures after appending them
 
     except Exception as e:
         # Store error in metrics
         metrics["error"] = str(e)
     # END CODE
-    
+
     Key requirements:
     1. ONLY add imports you actually need
     2. ONLY reference columns that actually exist in the dataset
-    3. Keep preprocessing to minimum: drop na, encode categoricals with pd.get_dummies()
-    4. Use standard train_test_split from sklearn
-    5. Store ALL metrics as native Python types (float, list, dict)
-    6. Close all figures after appending to the figures list
-    7. Handle errors gracefully in the try/except block
-    8. For classification, just make ONE confusion matrix plot
-    9. DO NOT attempt any preprocessing beyond the absolute basics
-    10. DO NOT create any complex Pipeline objects
+    3. Use standard train_test_split from sklearn
+    4. Store metrics as Python native types (float, list, dict)
+    5. Close all figures after appending to the figures list
+    6. Handle errors gracefully in the try/except block
+    7. For classification models, always include a confusion matrix plot
+    8. ALWAYS include a feature importance plot using one of these methods:
+       a. For tree-based models (Random Forest, Gradient Boosting): use model.feature_importances_
+       b. For linear models (Linear/Logistic Regression): use model.coef_
+       c. For models without built-in importance: use permutation_importance from sklearn.inspection
+       d. For K-Means: plot feature importance based on distance to cluster centers
+    9. Make sure ALL metrics are properly stored
+    10. Set max_iter=1000 for models like LogisticRegression that might not converge
+    
+    FEATURE IMPORTANCE INSTRUCTIONS:
+    Always create a feature importance visualization regardless of the model type. Use this approach:
+
+    1. For tree-based models (RandomForest, GradientBoosting): 
+   - Use model.feature_importances_ directly
+
+    2. For linear models (LinearRegression, LogisticRegression, Ridge, Lasso):
+   - Use the absolute values of model.coef_
+   - For multi-class: take the mean absolute value across classes
+
+    3. For models without built-in importance (SVC, KNN, Neural Networks):
+   - Use permutation_importance from sklearn.inspection:
+     ```
+     from sklearn.inspection import permutation_importance
+     r = permutation_importance(model, X_test, y_test, n_repeats=10, random_state=42)
+     importances = r.importances_mean
+     ```
+
+    4. For K-Means clustering:
+   - Plot feature importance based on the variance of cluster centers across features
+
+    Always sort features by importance and display the top 10-15 most important ones.
+    Always include this visualization in your code no matter what model type is used.
     '''
 
     # Prepare the prompt
@@ -206,91 +225,31 @@ def generate_model_code(df, target_variable, model_approach, user_instructions="
     {user_instructions}
 
     IMPORTANT INSTRUCTION:
-    Generate extremely simple Python code for a {model_approach} model that predicts '{target_variable}'. The code should:
+    Generate Python code for a {model_approach} model that predicts '{target_variable}'. The code should:
     1. Handle basic preprocessing (just handle nulls and convert categorical variables)
     2. Split data (80% training, 20% testing)
-    3. Train a basic {model_approach} model with default parameters
-    4. Evaluate with simple metrics
-    5. Create only ONE visualization IF it's a classification model (just a confusion matrix)
-    6. Store all results in the provided variables (metrics, model_results, figures)
-
-    Make the code as simple and reliable as possible. Do not include any complex preprocessing, feature engineering, hyperparameter tuning, or multiple visualizations.
+    3. Train a basic {model_approach} model with appropriate parameters
+    4. Evaluate with all basic and useful metrics that relate to the model used
+    5. IF it's a classification model make sure to store the FULL classification_report in metrics["Classification Report"]
+    6. Make sure to use max_iter=1000 for algorithms like LogisticRegression to avoid convergence warnings
+    7. Store all results in the provided variables (metrics, model_results, figures)
+    8. Create appropriate visualizations (confusion matrix for classification, feature importance if available)
+    9. If possible add a feature importance visualization for the top 10 features
+    10. Make sure ALL numeric values stored in metrics are Python native types (float), not NumPy types
     """
 
     # Call OpenAI API
     response, error = call_openai_api(prompt, system_prompt)
 
     if error:
-        # Return a reliable fallback code that will work
-        return get_fallback_model_code(target_variable, model_approach)
+        return "⚠️ OpenAI API connection error. Please check your API key and internet connection. The AI-powered code generation is unavailable at the moment."
 
     if response:
         # Fix common indentation issues in the response
         response = fix_indentation(response)
+        return response
 
-        # Check if the response already contains imports and variables
-        has_imports = any(line.strip().startswith('import ') for line in response.split('\n'))
-        has_variables = any(line.strip().startswith('figures =') for line in response.split('\n'))
-
-        # Only add missing parts
-        code_parts = []
-
-        # Add imports if not present
-        if not has_imports:
-            code_parts.append("""
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
-""")
-            # Add model-specific imports
-            if "Linear Regression" in model_approach:
-                code_parts.append("from sklearn.linear_model import LinearRegression\n")
-            elif "Logistic Regression" in model_approach:
-                code_parts.append("from sklearn.linear_model import LogisticRegression\n")
-            elif "Random Forest" in model_approach:
-                code_parts.append("from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor\n")
-            elif "Support Vector" in model_approach:
-                code_parts.append("from sklearn.svm import SVC, SVR\n")
-
-        # Add variable initialization if not present
-        if not has_variables:
-            code_parts.append("""
-# Initialize variables
-figures = []
-model_results = {"model_type": "%s"}
-metrics = {}
-""" % model_approach)
-
-        # Add the API response
-        code_parts.append(response)
-
-        # For more reliability, we'll do one more check to ensure a try-except structure exists
-        if 'try:' not in response:
-            if 'except' not in response:
-                # Wrap the entire response in a try-except if it doesn't have one
-                code_parts = code_parts[:-1]  # Remove the last part (response)
-                code_parts.append("""
-try:
-    %s
-except Exception as e:
-    # Set default values in case of errors
-    metrics["error"] = str(e)
-    model_results["model_type"] = "Error - Model training failed"
-    model_results["error"] = str(e)
-""" % response.replace('\n', '\n    '))
-
-        code = '\n'.join(code_parts)
-
-        # Perform a final indentation check
-        code = validate_python_code(code)
-        return code
-
-    # Return a reliable fallback code that will work if there's an issue with the API
-    return get_fallback_model_code(target_variable, model_approach)
+    return "⚠️ OpenAI API returned an empty response. Please try again later."
 
 
 def fix_indentation(code_str):
@@ -335,219 +294,56 @@ def fix_indentation(code_str):
     return '\n'.join(fixed_lines)
 
 
-def validate_python_code(code):
-    """Attempt to validate Python code syntax and fix common issues"""
-    try:
-        # Try to compile the code to check for syntax errors
-        compile(code, '<string>', 'exec')
-        return code
-    except SyntaxError as e:
-        # If there's an indentation error, try to fix it
-        if 'indentation' in str(e).lower():
-            # Simple fix: ensure all lines after 'try:' are indented
-            lines = code.split('\n')
-            fixed_lines = []
-            in_try_block = False
-            try_indent = 0
+def process_metrics(metrics):
+    """Process metrics to make them display-friendly in Streamlit.
+    Especially handles the classification_report which has a nested structure.
+    """
+    processed_metrics = {}
 
-            for line in lines:
-                stripped = line.strip()
-
-                # Skip empty lines
-                if not stripped:
-                    fixed_lines.append(line)
+    # Process each metric
+    for key, value in metrics.items():
+        # Handle classification report specially
+        if key == "Classification Report" and isinstance(value, dict):
+            # Extract the main metrics for each class
+            for class_name, class_metrics in value.items():
+                if class_name in ['accuracy', 'macro avg', 'weighted avg']:
+                    # Keep these for separate display
                     continue
 
-                # Check for try statement
-                if stripped == 'try:':
-                    in_try_block = True
-                    try_indent = len(line) - len(line.lstrip())
-                    fixed_lines.append(line)
+                if isinstance(class_metrics, dict):
+                    # Extract precision, recall, f1-score for each class
+                    for metric_name, metric_value in class_metrics.items():
+                        if metric_name in ['precision', 'recall', 'f1-score']:
+                            new_key = f"Class {class_name} - {metric_name}"
+                            processed_metrics[new_key] = float(metric_value)
 
-                # Handle except/finally
-                elif in_try_block and (stripped.startswith('except') or stripped.startswith('finally:')):
-                    in_try_block = False
-                    fixed_lines.append(' ' * try_indent + stripped)
+            # Add overall metrics
+            if 'accuracy' in value:
+                processed_metrics['Overall Accuracy'] = float(value['accuracy'])
 
-                # Handle indentation inside try block
-                elif in_try_block:
-                    current_indent = len(line) - len(line.lstrip())
-                    if current_indent <= try_indent:
-                        # Not properly indented
-                        fixed_lines.append(' ' * (try_indent + 4) + stripped)
-                    else:
-                        fixed_lines.append(line)
+            if 'macro avg' in value and isinstance(value['macro avg'], dict):
+                for metric_name, metric_value in value['macro avg'].items():
+                    if metric_name in ['precision', 'recall', 'f1-score']:
+                        new_key = f"Macro Avg - {metric_name}"
+                        processed_metrics[new_key] = float(metric_value)
 
-                else:
-                    fixed_lines.append(line)
+            if 'weighted avg' in value and isinstance(value['weighted avg'], dict):
+                for metric_name, metric_value in value['weighted avg'].items():
+                    if metric_name in ['precision', 'recall', 'f1-score']:
+                        new_key = f"Weighted Avg - {metric_name}"
+                        processed_metrics[new_key] = float(metric_value)
 
-            return '\n'.join(fixed_lines)
+        # For confusion matrix, store as is (it will be displayed as a visualization)
+        elif key == "Confusion Matrix":
+            processed_metrics[key] = value
 
-        # For other syntax errors, return the fallback code
-        return code  # Return original code, will be handled by error handling in execute function
-
-
-def get_fallback_model_code(target_variable, model_approach):
-    """Return an extremely simple fallback model code that should work in all cases"""
-
-    # Set up the imports based on the model approach
-    imports = """
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-"""
-
-    if "Linear Regression" in model_approach:
-        imports += "from sklearn.linear_model import LinearRegression\n"
-        imports += "from sklearn.metrics import mean_squared_error, r2_score\n"
-        model_type = "Linear Regression"
-        is_classification = False
-    elif "Logistic Regression" in model_approach:
-        imports += "from sklearn.linear_model import LogisticRegression\n"
-        imports += "from sklearn.metrics import accuracy_score, confusion_matrix, classification_report\n"
-        model_type = "Logistic Regression"
-        is_classification = True
-    elif "Random Forest" in model_approach:
-        if "Classifier" in model_approach or "Classification" in model_approach:
-            imports += "from sklearn.ensemble import RandomForestClassifier\n"
-            imports += "from sklearn.metrics import accuracy_score, confusion_matrix, classification_report\n"
-            model_type = "Random Forest Classifier"
-            is_classification = True
+        # For other metrics, ensure they are Python native types
+        elif isinstance(value, (np.float64, np.float32, np.int64, np.int32)):
+            processed_metrics[key] = float(value)
         else:
-            imports += "from sklearn.ensemble import RandomForestRegressor\n"
-            imports += "from sklearn.metrics import mean_squared_error, r2_score\n"
-            model_type = "Random Forest Regressor"
-            is_classification = False
-    elif "Support Vector" in model_approach:
-        if "Classifier" in model_approach or "Classification" in model_approach:
-            imports += "from sklearn.svm import SVC\n"
-            imports += "from sklearn.metrics import accuracy_score, confusion_matrix, classification_report\n"
-            model_type = "Support Vector Classifier"
-            is_classification = True
-        else:
-            imports += "from sklearn.svm import SVR\n"
-            imports += "from sklearn.metrics import mean_squared_error, r2_score\n"
-            model_type = "Support Vector Regressor"
-            is_classification = False
-    else:
-        # Default to Logistic Regression for unknown model types
-        imports += "from sklearn.linear_model import LogisticRegression\n"
-        imports += "from sklearn.metrics import accuracy_score, confusion_matrix, classification_report\n"
-        model_type = "Logistic Regression"
-        is_classification = True
+            processed_metrics[key] = value
 
-    # Basic model code
-    model_code = f"""
-# Initialize variables
-figures = []
-model_results = {{"model_type": "{model_type}"}}
-metrics = {{}}
-
-try:
-    # Make a copy of the dataset
-    df_model = df.copy()
-
-    # Check if target variable exists
-    if '{target_variable}' not in df_model.columns:
-        raise ValueError("Target variable '{target_variable}' not found in the dataset")
-
-    # Handle missing values in target column
-    df_model = df_model.dropna(subset=['{target_variable}'])
-
-    # Basic preprocessing
-    # Get categorical columns
-    categorical_cols = df_model.select_dtypes(include=['object']).columns.tolist()
-    # Remove target from categorical columns if it's there
-    if '{target_variable}' in categorical_cols:
-        categorical_cols.remove('{target_variable}')
-
-    # Convert categorical columns to dummies
-    if categorical_cols:
-        df_model = pd.get_dummies(df_model, columns=categorical_cols, drop_first=True)
-
-    # Prepare X and y
-    X = df_model.drop(columns=['{target_variable}'])
-    y = df_model['{target_variable}']
-
-    # Split the data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # Get numeric columns for scaling
-    numeric_cols = X.select_dtypes(include=['number']).columns.tolist()
-
-    # Scale numeric features
-    if numeric_cols:
-        scaler = StandardScaler()
-        X_train_scaled = X_train.copy()
-        X_test_scaled = X_test.copy()
-        X_train_scaled[numeric_cols] = scaler.fit_transform(X_train[numeric_cols])
-        X_test_scaled[numeric_cols] = scaler.transform(X_test[numeric_cols])
-    else:
-        X_train_scaled = X_train
-        X_test_scaled = X_test
-"""
-
-    # Add model-specific code
-    if is_classification:
-        model_code += f"""    
-    # Train the model
-    model = {'LogisticRegression(max_iter=1000)' if 'Logistic' in model_type else 'SVC(probability=True)' if 'Support Vector' in model_type else 'RandomForestClassifier(n_estimators=100, random_state=42)'}
-    model.fit(X_train_scaled, y_train)
-
-    # Make predictions
-    y_pred = model.predict(X_test_scaled)
-
-    # Calculate metrics
-    accuracy = accuracy_score(y_test, y_pred)
-    metrics["Accuracy"] = float(accuracy)
-
-    # Classification report
-    report = classification_report(y_test, y_pred, output_dict=True)
-    metrics["Classification Report"] = report
-
-    # Confusion matrix
-    cm = confusion_matrix(y_test, y_pred)
-    metrics["Confusion Matrix"] = cm.tolist()
-
-    # Create confusion matrix visualization
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax)
-    ax.set_title('Confusion Matrix')
-    ax.set_xlabel('Predicted')
-    ax.set_ylabel('Actual')
-    figures.append(fig)
-    plt.close(fig)
-"""
-    else:
-        model_code += f"""
-    # Train the model
-    model = {'LinearRegression()' if 'Linear' in model_type else 'SVR()' if 'Support Vector' in model_type else 'RandomForestRegressor(n_estimators=100, random_state=42)'}
-    model.fit(X_train_scaled, y_train)
-
-    # Make predictions
-    y_pred = model.predict(X_test_scaled)
-
-    # Calculate metrics
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-    metrics["Mean Squared Error"] = float(mse)
-    metrics["R² Score"] = float(r2)
-"""
-
-    # Error handling
-    model_code += """
-except Exception as e:
-    # Store error in metrics
-    metrics["error"] = str(e)
-    model_results["model_type"] = "Error - Model training failed"
-    model_results["error"] = str(e)
-"""
-
-    # Combine and return the full code
-    return imports + model_code
+    return processed_metrics
 
 
 def execute_model_code(df, code):
@@ -622,11 +418,14 @@ def execute_model_code(df, code):
         metrics = exec_globals.get('metrics', {})
         figures = exec_globals.get('figures', [])
 
+        # Process metrics for cleaner display
+        processed_metrics = process_metrics(metrics)
+
         # Restore stdout
         sys.stdout = old_stdout
         output = mystdout.getvalue()
 
-        return model_results, metrics, figures, output
+        return model_results, processed_metrics, figures, output
 
     except Exception as e:
         # Restore stdout in case of error
@@ -728,3 +527,197 @@ def fix_code_indentation(code):
             i += 1
 
     return '\n'.join(result)
+
+
+def generate_universal_feature_importance_code():
+    """Returns code snippet for generating feature importance for any model type"""
+    return """
+    # Generate feature importance regardless of model type
+    feature_names = X.columns
+
+    # Method 1: Use built-in feature_importances_ if available (tree-based models)
+    if hasattr(model, 'feature_importances_'):
+        importances = model.feature_importances_
+        indices = np.argsort(importances)[::-1]
+        top_indices = indices[:min(15, len(feature_names))]
+
+        # Create feature importance DataFrame
+        importance_df = pd.DataFrame({
+            'Feature': [feature_names[i] for i in top_indices],
+            'Importance': [importances[i] for i in top_indices]
+        })
+        model_results['feature_importance'] = importance_df
+
+    # Method 2: Use coefficients if available (linear models)
+    elif hasattr(model, 'coef_'):
+        coef = model.coef_
+
+        # Handle multi-class case (shape will be [n_classes, n_features])
+        if len(coef.shape) > 1 and coef.shape[0] > 1:
+            # Take mean absolute value across classes
+            importances = np.mean(np.abs(coef), axis=0)
+        else:
+            # Handle binary classification or regression (flatten if needed)
+            importances = np.abs(coef.flatten())
+
+        indices = np.argsort(importances)[::-1]
+        top_indices = indices[:min(15, len(feature_names))]
+
+        # Create feature importance DataFrame
+        importance_df = pd.DataFrame({
+            'Feature': [feature_names[i] for i in top_indices],
+            'Importance': [importances[i] for i in top_indices]
+        })
+        model_results['feature_importance'] = importance_df
+
+    # Method 3: Use permutation importance as fallback
+    else:
+        try:
+            # Import permutation_importance if not already imported
+            from sklearn.inspection import permutation_importance
+
+            # Calculate permutation importance
+            r = permutation_importance(model, X_test, y_test, n_repeats=5, random_state=42)
+            importances = r.importances_mean
+            indices = np.argsort(importances)[::-1]
+            top_indices = indices[:min(15, len(feature_names))]
+
+            # Create feature importance DataFrame
+            importance_df = pd.DataFrame({
+                'Feature': [feature_names[i] for i in top_indices],
+                'Importance': [importances[i] for i in top_indices]
+            })
+            model_results['feature_importance'] = importance_df
+        except Exception as e:
+            # If permutation importance fails, create dummy importance based on data variance
+            variances = X.var().sort_values(ascending=False)
+            top_features = variances.index[:min(15, len(feature_names))]
+
+            # Create feature importance DataFrame based on feature variance
+            importance_df = pd.DataFrame({
+                'Feature': top_features,
+                'Importance': variances[top_features].values / variances.max()  # Normalize to 0-1
+            })
+            model_results['feature_importance'] = importance_df
+            metrics["feature_importance_note"] = "Built-in feature importance not available; using feature variance as proxy"
+
+    # Always create a visualization of feature importance
+    if 'feature_importance' in model_results:
+        fig, ax = plt.subplots(figsize=(10, 6))
+        importance_df = model_results['feature_importance'].sort_values('Importance', ascending=False)
+        sns.barplot(x='Importance', y='Feature', data=importance_df, ax=ax)
+        ax.set_title('Feature Importance')
+        ax.set_xlabel('Importance')
+        ax.set_ylabel('Feature')
+        figures.append(fig)
+        plt.close(fig)
+    """
+
+
+def show_model_preview(df, model_results, metrics, figures, model_code, model_output):
+    """Show model preview with results, metrics, and visualizations"""
+    st.subheader("Model Results")
+
+    # Create tabs for different views
+    preview_tab, code_tab, output_tab = st.tabs(["Results & Metrics", "Model Code", "Execution Output"])
+
+    with preview_tab:
+        # Display metrics
+        st.subheader("Model Performance Metrics")
+
+        # Display metrics in a nice format
+        metrics_items = list(metrics.items())
+        # Sort metrics putting error first if it exists, and confusion matrix last
+        metrics_items.sort(key=lambda x: (
+            0 if x[0] == "error" else
+            2 if x[0] == "Confusion Matrix" else
+            2 if x[0] == "feature_importance_note" else
+            1
+        ))
+
+        # Convert to DataFrame excluding Confusion Matrix which is displayed as a visualization
+        metrics_df = pd.DataFrame([
+            {"Metric": k, "Value": v} for k, v in metrics_items
+            if k not in ["Confusion Matrix", "Classification Report"]
+        ])
+
+        # Show the metrics table
+        if not metrics_df.empty:
+            st.table(metrics_df)
+
+        # Display any model-specific results
+        if isinstance(model_results, dict) and model_results.get('model_type'):
+            st.subheader(f"{model_results['model_type']} Model Results")
+
+            # Display feature importance as both table and plot for better comprehension
+            if 'feature_importance' in model_results:
+                st.subheader("Feature Importance")
+
+                if "feature_importance_note" in metrics:
+                    st.info(metrics["feature_importance_note"])
+
+                col1, col2 = st.columns([1, 2])
+
+                with col1:
+                    st.write("**Importance Values:**")
+                    if isinstance(model_results['feature_importance'], pd.DataFrame):
+                        st.dataframe(model_results['feature_importance'].set_index('Feature'))
+
+                # Find and display the feature importance plot for better visibility
+                feature_importance_found = False
+                for i, fig in enumerate(figures):
+                    if hasattr(fig, 'axes') and fig.axes and hasattr(fig.axes[0], 'get_title'):
+                        if fig.axes[0].get_title() == 'Feature Importance':
+                            with col2:
+                                st.pyplot(fig)
+                                feature_importance_found = True
+                                break
+
+                if not feature_importance_found:
+                    with col2:
+                        st.write("Feature importance visualization not found in figures.")
+
+        # Display all other visualizations
+        st.subheader("Model Visualizations")
+        for i, fig in enumerate(figures):
+            # Skip feature importance plot as it's already shown above
+            if hasattr(fig, 'axes') and fig.axes and hasattr(fig.axes[0], 'get_title'):
+                if fig.axes[0].get_title() == 'Feature Importance':
+                    continue
+            st.pyplot(fig)
+
+        # Generate PDF report button
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Generate PDF Report"):
+                with st.spinner("Generating PDF report..."):
+                    try:
+                        # Import here to avoid circular imports
+                        from utils.data_visualization import generate_model_pdf_report
+
+                        pdf_bytes = generate_model_pdf_report(df, model_results, metrics, figures)
+
+                        # Create download button for PDF
+                        b64_pdf = base64.b64encode(pdf_bytes).decode()
+                        href = f'<a href="data:application/pdf;base64,{b64_pdf}" download="model_report.pdf">Download PDF Report</a>'
+                        st.markdown(href, unsafe_allow_html=True)
+
+                        st.success("PDF report generated! Click the link above to download.")
+                    except Exception as e:
+                        import traceback
+                        st.error(f"Error generating PDF report: {str(e)}")
+                        st.code(traceback.format_exc())
+
+        with col2:
+            if st.button("Discard Model"):
+                # Reset modeling state
+                st.session_state.show_model_preview = False
+                st.session_state.display_modeling_options = False
+                st.success("Model discarded!")
+                st.rerun()
+
+    with code_tab:
+        st.code(model_code, language="python")
+
+    with output_tab:
+        st.text(model_output)

@@ -25,44 +25,6 @@ load_dotenv()
 st.title("CSV & OpenAI Integration")
 
 
-def generate_fallback_suggestions(df, null_analysis):
-    """Generate basic cleaning suggestions without using OpenAI API"""
-    suggestions = []
-
-    # Check for completely null columns
-    if null_analysis['completely_null_columns']:
-        suggestions.append(f"Drop completely null columns: {', '.join(null_analysis['completely_null_columns'])}")
-
-    # Check for high null percentage columns
-    if null_analysis['high_null_columns']:
-        suggestions.append(
-            f"Consider dropping or imputing columns with high null percentage: {', '.join(null_analysis['high_null_columns'])}")
-
-    # Check for rows with too many nulls
-    if null_analysis['rows_with_nulls_percentage'] > 50:
-        suggestions.append(
-            f"Consider dropping rows with too many null values (currently {null_analysis['rows_with_nulls_percentage']:.2f}% of rows have nulls)")
-
-    # Check for numeric columns that might need imputation
-    numeric_cols = [col for col in df.columns if df[col].dtype.kind in 'ifc']
-    if numeric_cols:
-        suggestions.append(
-            f"Consider imputing missing values in numeric columns using mean or median: {', '.join(numeric_cols[:5])}{'...' if len(numeric_cols) > 5 else ''}")
-
-    # Check for categorical columns that might need imputation
-    cat_cols = [col for col in df.columns if df[col].dtype == 'object']
-    if cat_cols:
-        suggestions.append(
-            f"Consider imputing missing values in categorical columns using mode or a specific value: {', '.join(cat_cols[:5])}{'...' if len(cat_cols) > 5 else ''}")
-
-    # Basic data quality suggestions
-    suggestions.append("Check for and handle outliers in numeric columns")
-    suggestions.append("Normalize or standardize numeric features if needed")
-    suggestions.append("Convert categorical variables to numeric using one-hot encoding")
-
-    return "\n".join([f"- {suggestion}" for suggestion in suggestions])
-
-
 # Initialize session state variables
 def init_session_state():
     if 'df' not in st.session_state:
@@ -194,17 +156,17 @@ if uploaded_file is not None and not st.session_state.file_processed:
                     # If no cleaning suggestions were generated, use fallback
                     if not st.session_state.cleaning_suggestions:
                         st.warning(
-                            "Could not generate cleaning suggestions using OpenAI API. Using basic suggestions instead.")
+                            "Could not generate cleaning suggestions using OpenAI API.")
                         data_description = "This appears to be a dataset with the following structure: " + ", ".join(
                             full_df.columns[:5]) + "..."
-                        cleaning_suggestions = generate_fallback_suggestions(full_df, null_analysis)
+                        cleaning_suggestions = "There was an error when generating cleaning suggestions"
                         st.session_state.data_description = data_description
                         st.session_state.cleaning_suggestions = cleaning_suggestions
                 else:
                     # Use fallback if API error
                     data_description = "This appears to be a dataset with the following structure: " + ", ".join(
                         full_df.columns[:5]) + "..."
-                    cleaning_suggestions = generate_fallback_suggestions(full_df, null_analysis)
+                    cleaning_suggestions = "There was an error when generating cleaning suggestions"
                     st.session_state.data_description = data_description
                     st.session_state.cleaning_suggestions = cleaning_suggestions
             except Exception as e:
@@ -213,7 +175,7 @@ if uploaded_file is not None and not st.session_state.file_processed:
                 # Use fallback suggestions
                 data_description = "This appears to be a dataset with the following structure: " + ", ".join(
                     full_df.columns[:5]) + "..."
-                cleaning_suggestions = generate_fallback_suggestions(full_df, null_analysis)
+                cleaning_suggestions = "There was an error when generating cleaning suggestions"
                 st.session_state.data_description = data_description
                 st.session_state.cleaning_suggestions = cleaning_suggestions
 

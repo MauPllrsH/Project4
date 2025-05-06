@@ -47,5 +47,4 @@ def handle_dataset_upload(uploaded_file):
 
     except Exception as e:
         st.error(f"Error processing file: {str(e)}")
-        st.code(traceback.format_exc())
         return None

@@ -126,7 +126,7 @@ def generate_analysis_suggestions(df, data_description, null_analysis):
     """Generate data analysis and visualization suggestions using OpenAI"""
     # First check if df is valid
     if df is None or not hasattr(df, 'empty') or df.empty:
-        return generate_fallback_analysis_suggestions(None)
+        return "Dataframe is not valid, either None or is empty"
 
     system_prompt = '''
     You are a data analysis assistant. Based on the dataset information provided, you will suggest specific data analysis approaches and visualizations that would provide the most meaningful insights.
@@ -215,136 +215,17 @@ def generate_analysis_suggestions(df, data_description, null_analysis):
         # Log the error for debugging
         if error:
             print(f"OpenAI API error: {error}")
-            return generate_fallback_analysis_suggestions(df)
+            return "OpenAI API Error"
 
         # Check if we got a valid response
         if response and isinstance(response, str) and len(response.strip()) > 0:
             return response
         else:
             print("Empty or invalid response from OpenAI API")
-            return generate_fallback_analysis_suggestions(df)
+            return "Empty or invalid response from OpenAI API"
 
     except Exception as e:
         import traceback
         print(f"Error in generate_analysis_suggestions: {str(e)}")
         print(traceback.format_exc())
-        return generate_fallback_analysis_suggestions(df)
-
-
-def generate_fallback_analysis_suggestions(df):
-    """Generate basic analysis suggestions without using OpenAI API"""
-    suggestions = []
-
-    # Handle None or empty DataFrame
-    if df is None or not hasattr(df, 'empty') or df.empty:
-        return """
-        - **Distribution Analysis**: Create histograms for key numeric variables to understand their distributions and identify outliers.
-        - **Correlation Analysis**: Generate a correlation heatmap for numeric columns to identify relationships between variables.
-        - **Time Series Analysis**: If time-related columns exist, plot metrics over time to identify trends and seasonality.
-        - **Categorical Variable Analysis**: Create bar charts to show the distribution of categories in categorical columns.
-        - **Group Comparison**: Compare numeric metrics across different categorical groups using box plots or bar charts.
-        - **Multi-variable Relationships**: Generate scatter plots or pair plots to see relationships between multiple variables.
-        """
-
-    # Get column types
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    datetime_cols = df.select_dtypes(include=['datetime']).columns.tolist()
-
-    # Add univariate distribution suggestions
-    if numeric_cols:
-        suggestions.append(
-            f"- **Distribution Analysis**: Create histograms for key numeric variables such as {', '.join(numeric_cols[:3])} to understand their distributions, identify outliers, and check for normality.")
-
-    # Add correlation suggestions for numeric columns
-    if len(numeric_cols) > 1:
-        suggestions.append(
-            f"- **Correlation Analysis**: Create a correlation heatmap for numeric columns to identify relationships between variables like {', '.join(numeric_cols[:3])}. This can reveal which features are strongly related to each other.")
-
-    # Add time series suggestion if datetime columns exist
-    if datetime_cols:
-        time_col = datetime_cols[0]
-        if numeric_cols:
-            suggestions.append(
-                f"- **Time Series Analysis**: Plot {numeric_cols[0]} over time using {time_col} to identify trends, seasonality, and potential anomalies.")
-
-    # Add categorical distribution suggestion
-    if categorical_cols:
-        suggestions.append(
-            f"- **Categorical Variable Analysis**: Create bar charts to show the distribution of categories in {', '.join(categorical_cols[:2])}. This helps understand the balance of different categories in the data.")
-
-    # Add bivariate analysis suggestions
-    if numeric_cols and len(numeric_cols) > 1:
-        suggestions.append(
-            f"- **Scatter Plot Analysis**: Create scatter plots to visualize relationships between pairs of numeric variables (e.g., {numeric_cols[0]} vs {numeric_cols[1]}). Look for linear relationships, clusters, or outliers.")
-
-    # Add group analysis suggestion if both categorical and numeric
-    if categorical_cols and numeric_cols:
-        suggestions.append(
-            f"- **Group Comparison**: Create box plots or bar charts to compare {numeric_cols[0]} across different categories of {categorical_cols[0]}. This reveals how numeric variables differ across groups.")
-
-    # Add pair plot suggestion for multiple numeric columns
-    if len(numeric_cols) > 2:
-        suggestions.append(
-            f"- **Multi-variable Relationships**: Generate a pair plot to see relationships between multiple numeric variables at once. This provides a comprehensive view of how variables relate to each other.")
-
-    # If somehow we still have no suggestions, add generic ones
-    if not suggestions:
-        suggestions = [
-            "- **Distribution Analysis**: Create histograms for numeric variables to understand their distributions.",
-            "- **Categorical Analysis**: Generate bar charts for categorical variables to see their distributions.",
-            "- **Correlation Analysis**: Create a correlation heatmap to identify relationships between numeric variables.",
-            "- **Summary Statistics**: Calculate summary statistics for key columns to understand central tendencies and spread.",
-            "- **Missing Value Patterns**: Visualize patterns of missing values to understand data completeness."
-        ]
-
-    return "\n".join(suggestions)
-
-
-def generate_fallback_analysis_suggestions(df):
-    """Generate basic analysis suggestions without using OpenAI API"""
-    suggestions = []
-
-    # Get column types
-    numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-    datetime_cols = df.select_dtypes(include=['datetime']).columns.tolist()
-
-    # Add univariate distribution suggestions
-    if numeric_cols:
-        suggestions.append(
-            f"- **Distribution Analysis**: Create histograms for key numeric variables such as {', '.join(numeric_cols[:3])} to understand their distributions, identify outliers, and check for normality.")
-
-    # Add correlation suggestions for numeric columns
-    if len(numeric_cols) > 1:
-        suggestions.append(
-            f"- **Correlation Analysis**: Create a correlation heatmap for numeric columns to identify relationships between variables like {', '.join(numeric_cols[:3])}. This can reveal which features are strongly related to each other.")
-
-    # Add time series suggestion if datetime columns exist
-    if datetime_cols:
-        time_col = datetime_cols[0]
-        if numeric_cols:
-            suggestions.append(
-                f"- **Time Series Analysis**: Plot {numeric_cols[0]} over time using {time_col} to identify trends, seasonality, and potential anomalies.")
-
-    # Add categorical distribution suggestion
-    if categorical_cols:
-        suggestions.append(
-            f"- **Categorical Variable Analysis**: Create bar charts to show the distribution of categories in {', '.join(categorical_cols[:2])}. This helps understand the balance of different categories in the data.")
-
-    # Add bivariate analysis suggestions
-    if numeric_cols and len(numeric_cols) > 1:
-        suggestions.append(
-            f"- **Scatter Plot Analysis**: Create scatter plots to visualize relationships between pairs of numeric variables (e.g., {numeric_cols[0]} vs {numeric_cols[1]}). Look for linear relationships, clusters, or outliers.")
-
-    # Add group analysis suggestion if both categorical and numeric
-    if categorical_cols and numeric_cols:
-        suggestions.append(
-            f"- **Group Comparison**: Create box plots or bar charts to compare {numeric_cols[0]} across different categories of {categorical_cols[0]}. This reveals how numeric variables differ across groups.")
-
-    # Add pair plot suggestion for multiple numeric columns
-    if len(numeric_cols) > 2:
-        suggestions.append(
-            f"- **Multi-variable Relationships**: Generate a pair plot to see relationships between multiple numeric variables at once. This provides a comprehensive view of how variables relate to each other.")
-
-    return "\n".join(suggestions)
+        return "Error while generating suggestions"
